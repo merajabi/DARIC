@@ -1,0 +1,4 @@
+[submodule "ISO8583"]
+	path = ISO8583
+	url = https://github.com/merajabi/ISO8583
+
