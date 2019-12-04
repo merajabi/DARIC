@@ -10,38 +10,57 @@ $| = 1;
 use Data::Dumper;
 use DARIC;
 
-my $server	= '85.10.1.131';	my $port	= '9999';
+my $server	= shift || '127.0.0.1';	
+my $port	= shift || '9999';
 
-	local $@;
-	eval {
-=pod
-		my $socket = new IO::Socket::INET (
-				PeerHost => $server,
-				PeerPort => $port,
-				Proto => 'tcp'
-			);
-		die "Cannot create a socket $! \n" unless $socket;
-=cut
-		my $client = new DARIC();
-		my ($typeHash, $dataHash) = $client->LoadData(\*STDIN);
-		my $request = $client->GenerateRequest($typeHash, $dataHash);
+local $@;
+eval {
 
-		my $hexreq = pack "H*", $request;
-#		print $socket->send($hexreq)," bytes send\n";
+	my $socket = new IO::Socket::INET (
+			PeerHost => $server,
+			PeerPort => $port,
+			Proto => 'tcp'
+		);
+	die "Cannot create a socket $! \n" unless $socket;
 
-		my $hexres;
-#		$socket->recv($hexres,1024);
-#		$socket->close(); 
+	my $client = new DARIC();
+	my ($typeHash, $dataHash) = $client->LoadData(\*STDIN);
+	{
+		my $pan;
+		if( exists($$dataHash{'2'}) ){
+			$pan = $$dataHash{'2'};
+		}elsif( exists($$dataHash{'35'}) ){
+			if( $$dataHash{'35'} =~ m/^(\d+)=/ ){
+				$pan = $1;
+			}
+		}
 
-#		my ($response) = unpack "H*", $hexres;
-#		chomp($response);
-#		print "res: ", $response,"\n";
+		die "NO PAN" if(!$pan);
+		my $pin = $$dataHash{'52'};
+		my $pinKey = $$typeHash{'PINKEY'};
+		my $pinBlock=`./crypt.pl "PIN" $pinKey $pin $pan`;
+		chomp($pinBlock);
+		$$dataHash{'52'} = $pinBlock;
+	}
+	my $request = $client->GenerateRequest($typeHash, $dataHash);
 
-		$client->ProcessResponse($typeHash, $request);
-	}; if($@){
-		print $@,"\n";
-		exit;
-	}	
+	my $hexreq = pack "H*", $request;
+	print $socket->send($hexreq)," bytes send\n";
+
+	my $hexres;
+	$socket->recv($hexres,1024);
+	$socket->close(); 
+
+	my ($response) = unpack "H*", $hexres;
+	chomp($response);
+	print "res: ", $response,"\n";
+
+	$client->ProcessResponse($typeHash, $response);
+
+}; if($@){
+	print $@,"\n";
+	exit;
+}	
 
 
 
