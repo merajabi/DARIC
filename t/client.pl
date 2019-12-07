@@ -25,6 +25,8 @@ eval {
 
 	my $client = new DARIC();
 	my ($typeHash, $dataHash) = $client->LoadData(\*STDIN);
+
+	if($$typeHash{"MTI"} eq "1200")
 	{
 		my $pan;
 		if( exists($$dataHash{'2'}) ){
@@ -45,7 +47,7 @@ eval {
 	my $request = $client->GenerateRequest($typeHash, $dataHash);
 
 	my $hexreq = pack "H*", $request;
-	print $socket->send($hexreq)," bytes send\n";
+	print "# ",$socket->send($hexreq)," bytes send\n";
 
 	my $hexres;
 	$socket->recv($hexres,1024);
@@ -53,7 +55,7 @@ eval {
 
 	my ($response) = unpack "H*", $hexres;
 	chomp($response);
-	print "res: ", $response,"\n";
+	print "# ","res: ", $response,"\n";
 
 	$client->ProcessResponse($typeHash, $response);
 

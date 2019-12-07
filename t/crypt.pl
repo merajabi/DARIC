@@ -8,6 +8,15 @@ use Crypt::DES;
 #use Crypt::TripleDES::CBC;
 #use Digest::CMAC;
 
+if(@ARGV < 2){
+	print "usage:\n";
+	print "\t./crypt PIN key pin pan\n";
+	print "\t./crypt MAC key str len\n";
+	print "\t./crypt DES [encrypt|decrypt] str key\n";
+	print "\t./crypt 3DES [encrypt|decrypt] str key1 key2 key3\n";
+	exit;
+}
+
 my $crypto = "Crypt::DES"; # "Crypt::DES" Crypt::Blowfish
 my $blocksize = 8;
 
