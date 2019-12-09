@@ -22,10 +22,34 @@ eval {
 			Proto => 'tcp'
 		);
 	die "Cannot create a socket $! \n" unless $socket;
-
 	my $client = new DARIC();
 	my ($typeHash, $dataHash) = $client->LoadData(\*STDIN);
 
+	($typeHash, $dataHash) = PreProcess($typeHash, $dataHash);
+
+	my $request = $client->GenerateRequest($typeHash, $dataHash);
+
+	my $hexreq = pack "H*", $request;
+	print "# ",$socket->send($hexreq)," bytes send\n";
+
+	my $hexres;
+	$socket->recv($hexres,1024);
+	$socket->close(); 
+	die "No Message recieved \n" if(length($hexres) <= 0 );
+
+	my ($response) = unpack "H*", $hexres;
+	chomp($response);
+	print "# ","res: ", $response,"\n";
+
+	$client->ProcessResponse($typeHash, $response);
+
+}; if($@){
+	print $@,"\n";
+	exit;
+}	
+
+sub PreProcess {
+	my ($typeHash, $dataHash) = @_;
 	if($$typeHash{"MTI"} eq "1200")
 	{
 		my $pan;
@@ -44,25 +68,26 @@ eval {
 		chomp($pinBlock);
 		$$dataHash{'52'} = $pinBlock;
 	}
-	my $request = $client->GenerateRequest($typeHash, $dataHash);
+	if($$typeHash{"MTI"} eq "1100" and $$dataHash{'3'} eq "890000")
+	{
+		my $pan;
+		if( exists($$dataHash{'2'}) ){
+			$pan = $$dataHash{'2'};
+		}elsif( exists($$dataHash{'35'}) ){
+			if( $$dataHash{'35'} =~ m/^(\d+)=/ ){
+				$pan = $1;
+			}
+		}
 
-	my $hexreq = pack "H*", $request;
-	print "# ",$socket->send($hexreq)," bytes send\n";
+		die "NO PAN" if(!$pan);
+		my $pin = $$dataHash{'60'};
+		my $pinKey = $$typeHash{'PINKEY'};
+		my $pinBlock=`./crypt.pl "PIN" $pinKey $pin $pan`;
+		chomp($pinBlock);
+		$$dataHash{'60'} = $pinBlock;
+	}
 
-	my $hexres;
-	$socket->recv($hexres,1024);
-	$socket->close(); 
-
-	my ($response) = unpack "H*", $hexres;
-	chomp($response);
-	print "# ","res: ", $response,"\n";
-
-	$client->ProcessResponse($typeHash, $response);
-
-}; if($@){
-	print $@,"\n";
-	exit;
-}	
-
+	return ($typeHash, $dataHash);
+}
 
 

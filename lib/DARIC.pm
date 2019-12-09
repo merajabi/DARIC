@@ -34,7 +34,7 @@ sub LoadData {
 			$line =~ s/^\s+//;
 			next if( ! length $line or $line =~ m/^#/);
 			if($line =~ m/^(\d+)\s*:\s*(.+)?/){
-				$$dataHash{$1} = $2||"";
+				$$dataHash{$1} = $2//"";
 			}elsif ($line =~ m/^(ISO|MTI|TPDU|MACKEY|PINKEY|LEN)\s*:\s*(.+)/i){
 				$$typeHash{uc $1} = $2;
 			}else{
@@ -69,7 +69,7 @@ sub GenerateRequest {
 		print "# ","bitmap fields: ",join(' ',@{$bitmap->GetBits()}),"\n";
 		print "# ","bitmap: ",$bitmap->GetHexStr(),"\n";
 
-		my $fieldType = $iso->GetFields($$typeHash{'MTI'});
+		my $fieldType = $iso->GetFields($$typeHash{'MTI'}.((exists $$dataHash{3})?substr($$dataHash{3},0,2):""));
 		my $fieldList = [ sort { $a <=> $b } keys %$fieldType ];
 
 		$p1 .= $f->Set($iso->GetFieldFormat(1))->Pack($$typeHash{'MTI'});				# MTI code
@@ -77,8 +77,8 @@ sub GenerateRequest {
 
 		foreach my $key (@$fieldList) {
 			next if ($key == 1 or $key == 64 or $key == 128 );
-			print "# ","field: $key\n";
 			die "Mandatory field $key must be present in message" if( $$fieldType{$key} eq "M" and ! exists($$dataHash{$key}) );
+			print "# ","field: $key data: ".$$dataHash{$key}."\n";
 			$p1 .= $f->Set($iso->GetFieldFormat($key))->Pack($$dataHash{$key}) if ( exists($$dataHash{$key}) );
 		}
 		print "# ","ISO Message without MAC: ", $p1->Data(),"\n";
