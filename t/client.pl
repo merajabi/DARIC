@@ -27,7 +27,7 @@ eval {
 
 	($typeHash, $dataHash) = PreProcess($typeHash, $dataHash);
 
-	my $request = $client->GenerateRequest($typeHash, $dataHash);
+	my $request = $client->GenerateMessage($typeHash, $dataHash);
 
 	my $hexreq = pack "H*", $request;
 	print "# ",$socket->send($hexreq)," bytes send\n";
@@ -41,7 +41,7 @@ eval {
 	chomp($response);
 	print "# ","res: ", $response,"\n";
 
-	$client->ProcessResponse($typeHash, $response);
+	$client->ProcessMessage($typeHash, $response);
 
 }; if($@){
 	print $@,"\n";
