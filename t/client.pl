@@ -50,7 +50,18 @@ eval {
 
 sub PreProcess {
 	my ($typeHash, $dataHash) = @_;
-	if($$typeHash{"MTI"} eq "1200")
+	my $MTIPROCESS;
+
+	if(length($$typeHash{'MTI'})==2){
+		#$$typeHash{'MTI'} = $$typeHash{'MTI'} + 10;
+		$MTIPROCESS = $$typeHash{'MTI'}."Q";
+	}else{
+		$$typeHash{'MTI'} = $$typeHash{'MTI'};
+		$MTIPROCESS = $$typeHash{'MTI'}.((exists $$dataHash{3})?substr($$dataHash{3},0,2):"");
+	}
+	$$typeHash{'MTIPROCESS'} = $MTIPROCESS;
+
+	if($$typeHash{"MTI"} eq "1200" or $$typeHash{"MTI"} eq "04" or $$typeHash{"MTI"} eq "01")
 	{
 		my $pan;
 		if( exists($$dataHash{'2'}) ){

@@ -49,7 +49,7 @@ sub LoadData {
 	}; if($@){
 		print "# ",$@,"\n";
 	}	
-	print Dumper $dataHash;
+
 	return ($typeHash, $dataHash);
 }
 
@@ -70,11 +70,11 @@ sub ProcessMessage {
 		$str = $response;
 
 		($out,$len,$str) = $f->Set('BIN', 'BIN', 'FIX', 16)->UnPack($str);
-		($$typeHash{"TPDU"},$len,$str) = $f->Set('BIN', 'BIN', 'FIX', 40)->UnPack($str) if ( exists($$typeHash{"TPDU"}) );
+		($$typeHash{"TPDU"},$len,$str) = $f->Set($iso->GetFieldFormat('TPDU'))->UnPack($str) if ( exists($$typeHash{"TPDU"}) );
 		print "TPDU:".$$typeHash{"TPDU"}."\n";
-		($$typeHash{"MTI"},$len,$str) = $f->Set($iso->GetFieldFormat(1))->UnPack($str);		# MTI
+		($$typeHash{"MTI"},$len,$str) = $f->Set($iso->GetFieldFormat('MTI'))->UnPack($str);		# MTI
 		print "MTI:".$$typeHash{"MTI"}."\n";
-		($out,$len,$str) = $f->Set($iso->GetFieldFormat(0))->UnPack($str);		# bitmap
+		($out,$len,$str) = $f->Set($iso->GetFieldFormat('BITMAP'))->UnPack($str);		# bitmap
 
 		$bitmap->SetHexStr($out);
 		my $fieldList = $bitmap->GetBits();
@@ -88,7 +88,7 @@ sub ProcessMessage {
 		print "# ",$str,"\n";
 	}; if($@){
 		print "# ",$@,"\n";
-		exit;
+		die $@;
 	}	
 	return ($typeHash,$dataHash);
 }
@@ -111,7 +111,7 @@ sub GenerateMessage {
 	eval {
 
 		{
-			my $fieldType = $iso->GetFields($$typeHash{'MTI'}.((exists $$dataHash{3})?substr($$dataHash{3},0,2):""));
+			my $fieldType = $iso->GetFields($$typeHash{'MTIPROCESS'});
 			my $fieldList = [ sort { $a <=> $b } keys %$fieldType ];
 
 			foreach my $key (@$fieldList) {
@@ -133,8 +133,8 @@ sub GenerateMessage {
 			print "# ","bitmap fields: ",join(' ',@{$bitmap->GetBits()}),"\n";
 			print "# ","bitmap: ",$bitmap->GetHexStr(),"\n";
 
-			$p2 .= $f->Set($iso->GetFieldFormat(1))->Pack($$typeHash{'MTI'});		# MTI code
-			$p2 .= $f->Set($iso->GetFieldFormat(0))->Pack($bitmap->GetHexStr());	# BITMAP
+			$p2 .= $f->Set($iso->GetFieldFormat('MTI'))->Pack($$typeHash{'MTI'});		# MTI code
+			$p2 .= $f->Set($iso->GetFieldFormat('BITMAP'))->Pack($bitmap->GetHexStr());	# BITMAP
 			$p2 .= $p1;
 
 			print "# ","ISO Message without MAC: ", $p2->Data(),"\n";
@@ -142,11 +142,16 @@ sub GenerateMessage {
 		{
 			my $data = $p2->Data();
 			my $macKey = $$typeHash{"MACKEY"};
-			my $mac=`./crypt.pl "MAC" $macKey $data 16`;				# assume the MAC Key is = 0123456789ABCDEF
+			my $mac;
+			if(length $$typeHash{'MTI'} == 2){
+				$mac=`./crypt.pl "MAC" $macKey $data 8`;				# assume the MAC Key is = 0123456789ABCDEF
+			}else{
+				$mac=`./crypt.pl "MAC" $macKey $data 16`;				# assume the MAC Key is = 0123456789ABCDEF
+			}
 			chomp($mac);
 
 			# ISO8583 messaging has no routing information, so is sometimes used with a TPDU header. 
-			$p3 .= $f->Set('BIN', 'BIN', 'FIX', 40)->Pack($$typeHash{"TPDU"}) if ( exists($$typeHash{"TPDU"}) );
+			$p3 .= $f->Set($iso->GetFieldFormat('TPDU'))->Pack($$typeHash{"TPDU"}) if ( exists($$typeHash{"TPDU"}) );
 			$p3 .= $p2;
 			$p3 .= $f->Set($iso->GetFieldFormat($$typeHash{"LEN"}))->Pack($mac);				# 64 or 128 Message Authentication Code (MAC)
 		}
@@ -159,7 +164,7 @@ sub GenerateMessage {
 		}
 	}; if($@){
 		print "# ",$@,"\n";
-		exit;
+		die $@;
 	}	
 
 	return $p4->Data();
