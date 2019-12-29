@@ -10,10 +10,18 @@ $| = 1;
 use Data::Dumper;
 use DARIC;
 
+if(@ARGV < 5){
+	print "usage:\n";
+	print "./server IP PORT ISO length path-to-data-files \n";
+	print "./server 172.20.122.160 9999 ISO8583vbpmATM 128 ../bpm/atm \n";
+	exit;
+}
+
 my $server	= shift || '127.0.0.1';	
 my $port	= shift || '9999';
 my $isoFormat = shift;
 my $isoLen = shift;
+my $path = shift;
 
 my $IRID = 111111111111; # Internal Reference ID # 31	Acquirer Reference Data
 
@@ -101,10 +109,10 @@ sub ValidateRequest {
 
 		{
 			my $file;
-			if( -f "../bpm/$MTIPROCESS.txt"){
-				$file = "../bpm/$MTIPROCESS.txt";
-			}elsif( -f "../bpm/".substr($MTIPROCESS,0,4).".txt" ){
-				$file = "../bpm/".substr($MTIPROCESS,0,4).".txt";
+			if( -f "$path/$MTIPROCESS.txt"){
+				$file = "$path/$MTIPROCESS.txt";
+			}elsif( -f "$path/".substr($MTIPROCESS,0,4).".txt" ){
+				$file = "$path/".substr($MTIPROCESS,0,4).".txt";
 			}
 			
 			if( defined($file) ) {

@@ -2,13 +2,21 @@
 use strict;
 use warnings;
 use lib "../lib";
-
+use lib qw(../ISO8583/lib);
 use POSIX;
 use IO::Socket::INET;
 $| = 1;
 
+use DataPackager::LV;
 use Data::Dumper;
 use DARIC;
+
+if(@ARGV < 2){
+	print "usage:\n";
+	print "./server IP PORT < path-to-data-file \n";
+	print "./server 172.20.122.160 9999 < ../bpm/atm/120031.txt \n";
+	exit;
+}
 
 my $server	= shift || '127.0.0.1';	
 my $port	= shift || '9999';
@@ -51,6 +59,7 @@ eval {
 sub PreProcess {
 	my ($typeHash, $dataHash) = @_;
 	my $MTIPROCESS;
+	my $f = new DataPackager::LV();
 
 	if(length($$typeHash{'MTI'})==2){
 		#$$typeHash{'MTI'} = $$typeHash{'MTI'} + 10;
@@ -93,9 +102,18 @@ sub PreProcess {
 		die "NO PAN" if(!$pan);
 		my $pin = $$dataHash{'60'};
 		my $pinKey = $$typeHash{'PINKEY'};
-		my $pinBlock=`./crypt.pl "PIN" $pinKey $pin $pan`;
+		my $pinBlock=`perl crypt.pl "PIN" $pinKey $pin $pan`;
 		chomp($pinBlock);
 		$$dataHash{'60'} = $pinBlock;
+	}
+	if($$typeHash{"MTI"} eq "1800" and $$dataHash{'3'} eq "000000")
+	{
+		my $pin = $$dataHash{'52'};
+		my $pinKey = $$typeHash{'PINKEY'};
+		my $pinStr = $f->Set('ASC', 'ASC', 'FIX', 8)->Pack($pin);
+		my $pinBlock= `perl crypt.pl DES encrypt $pinStr $pinKey`;
+		chomp($pinBlock);
+		$$dataHash{'52'} = $pinBlock;
 	}
 
 	return ($typeHash, $dataHash);

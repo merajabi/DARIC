@@ -14,6 +14,7 @@ use DataPackager::LV;
 use DataFormat::ISO8583v87;
 use DataFormat::ISO8583vbpmATM;
 use DataFormat::ISO8583vbpmPOS;
+use DataFormat::ISO8583vbpmBRN;
 
 sub new {
 	my ($class, $bits) = @_;

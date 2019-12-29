@@ -1,12 +1,7 @@
 #!/usr/bin/perl -w
 
 use Data::Dumper;
-use Modern::Perl;
-
-#use Digest::EMAC qw(emac hexdigest base64digest);
 use Crypt::DES;
-#use Crypt::TripleDES::CBC;
-#use Digest::CMAC;
 
 if(@ARGV < 2){
 	print "usage:\n";
@@ -21,18 +16,90 @@ my $crypto = "Crypt::DES"; # "Crypt::DES" Crypt::Blowfish
 my $blocksize = 8;
 
 my $method =  shift;
-my $keyStr = shift;
 
 if ($method eq "MAC"){
+	my $keyStr = shift;
 	my $str = shift;
 	my $outlen = shift;
 	my $macBlock = MACBlock($crypto, $keyStr, $blocksize, $str);
 	print substr($macBlock,0,$outlen),"\n";
 }elsif ($method eq "PIN") {
+	my $keyStr = shift;
 	my $pin = shift;
 	my $pan = shift;
 	my $pinBlock = PINBlock($crypto, $keyStr, $pin, $pan );
 	print $pinBlock,"\n";
+}elsif ($method eq "DES") {
+	my $process = shift;
+	my $str = shift;
+	my $keyStr = shift;
+	my $out;
+	if($process eq "decrypt"){
+		$out = ECB (\&Decrypt, $crypto, 2*$blocksize, $str, $keyStr);
+	}elsif($process eq "encrypt"){
+		$out = ECB (\&Encrypt, $crypto, 2*$blocksize, $str, $keyStr);
+	}
+	print $out,"\n";
+}elsif ($method eq "3DES") {
+	my $process = shift;
+	my $str = shift;
+	my $key1Str = shift;
+	my $key2Str = shift;
+	my $key3Str = shift;
+	my $out;
+	if($process eq "decrypt"){
+		$out = ECB (\&Decrypt3, $crypto, 2*$blocksize, $str, $key1Str, $key2Str, $key3Str);
+	}elsif($process eq "encrypt"){
+		$out = ECB (\&Encrypt3, $crypto, 2*$blocksize, $str, $key1Str, $key2Str, $key3Str);
+	}
+	print $out,"\n";
+}
+
+sub Encrypt {
+	my ($crypto,$str, $keyStr) = @_;
+	my $key = pack "H*", $keyStr;
+	my $hex = pack "H*", $str;
+	my $cipher = $crypto->new($key);
+	my $out = $cipher->encrypt($hex);
+	my ($outStr) = unpack "H*", $out;
+	return $outStr
+}
+
+sub Decrypt {
+	my ($crypto,$str,$keyStr) = @_;
+	my $key = pack "H*", $keyStr;
+	my $hex = pack "H*", $str;
+	my $cipher = $crypto->new($key);
+	my $out = $cipher->decrypt($hex);
+	my ($outStr) = unpack "H*", $out;
+	return $outStr
+}
+sub Encrypt3 {
+	my ($crypto,$str,$key1Str,$key2Str,$key3Str) = @_;
+	
+	my $out1 = Encrypt($crypto,$str, $key1Str);
+	my $out2 = Decrypt($crypto,$out1,$key2Str);
+	my $out3 = Encrypt($crypto,$out2,$key3Str);
+	return $out3;
+}
+
+sub Decrypt3 {
+	my ($crypto,$str,$key1Str,$key2Str,$key3Str) = @_;
+
+	my $out1 = Decrypt($crypto,$str, $key3Str);
+	my $out2 = Encrypt($crypto,$out1,$key2Str);
+	my $out3 = Decrypt($crypto,$out2,$key1Str);
+	return $out3;
+}
+
+sub ECB {
+	my ($func, $crypto, $blocksize, $text, @keylist) = @_;
+	my $out;
+	for(my $i=0; $i < length($text); $i += $blocksize ) {
+		my $substr = substr($text,$i,$blocksize);
+		$out .= $func->( $crypto, $substr, @keylist );
+	}
+	return $out;
 }
 
 sub CBCENCMAC {
@@ -111,25 +178,18 @@ sub PINBlock {
 	return $pinBlockStr;
 }
 
-sub Encrypt {
-	my ($crypto,$keyStr,$decStr) = @_;
-	my $key = pack "H*", $keyStr;
-	my $dec = pack "H*", $decStr;
-	my $cipher = $crypto->new($key);
-	my $enc = $cipher->decrypt($dec);
-	my ($encStr) = unpack "H*", $enc;
-	print $encStr,"\n";
-	return $encStr
-}
 
-sub Decrypt {
-	my ($crypto,$keyStr,$encStr) = @_;
-	my $key = pack "H*", $keyStr;
-	my $enc = pack "H*", $encStr;
-	my $cipher = $crypto->new($key);
-	my $dec = $cipher->decrypt($enc);
-	my ($decStr) = unpack "H*", $dec;
-	print $decStr,"\n";
-	return $decStr
-}
+
+=pod
+my $mac = emac($key, $cipher, $text);
+my $digest = hexdigest($mac), "\n";
+#print base64digest($mac), "\n";
+=cut
+
+=pod
+my $omac1 = Digest::CMAC->new($key, $cipher);
+$omac1->add($text);
+my $mac = $omac1->digest;
+my $digest = $omac1->hexdigest;
+=cut
 
